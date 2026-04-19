@@ -23,10 +23,10 @@
 </p>
 
 <p align="center">
-  <a href="https://zvec.org/en/docs/quickstart/">🚀 <strong>快速开始</strong> </a> |
+  <a href="https://zvec.org/en/docs/db/quickstart/">🚀 <strong>快速开始</strong> </a> |
   <a href="https://zvec.org/en/">🏠 <strong>主页</strong> </a> |
-  <a href="https://zvec.org/en/docs/">📚 <strong>文档</strong> </a> |
-  <a href="https://zvec.org/en/docs/benchmarks/">📊 <strong>性能报告</strong> </a> |
+  <a href="https://zvec.org/en/docs/db/">📚 <strong>文档</strong> </a> |
+  <a href="https://zvec.org/en/docs/db/benchmarks/">📊 <strong>性能报告</strong> </a> |
   <a href="https://deepwiki.com/alibaba/zvec">🔎 <strong>DeepWiki</strong> </a> |
   <a href="https://discord.gg/rKddFBBu9z">🎮 <strong>Discord</strong> </a> |
   <a href="https://x.com/ZvecAI">🐦 <strong>X (Twitter)</strong> </a>
@@ -36,8 +36,9 @@
 
 > [!IMPORTANT]
 > 🚀  **v0.3.1 （2026 年 4 月 17 日）**
+>
 > - 放宽 Collection 路径限制；改进 Windows 上的路径处理。
-> 
+>
 > 🚀  **v0.3.0 （2026 年 4 月 3 日）**
 >
 > - **新平台支持**：支持 **Windows (MSVC)** 和 **Android**。发布了官方 Windows **Python** 和 **Node.js** 安装包。
@@ -52,6 +53,8 @@
 - **开箱即用**：[安装](#-安装)后即刻开始搜索，无需服务器、无需配置、零门槛。
 - **稠密 + 稀疏向量**：支持稠密向量和稀疏向量，提供多向量联合查询的原生支持。
 - **混合检索**：向量语义搜索 + 标量条件过滤，获得精确结果。
+- **持久化存储**：WAL 预写日志保障数据持久性 — 即使进程崩溃或意外断电，数据也不会丢失。
+- **并发访问**：支持多进程同时读取同一个 Collection；写入为单进程独占模式。
 - **进程内运行**：无需单独部署服务，纯进程内运行。Notebook、高性能服务器、CLI 工具、边缘设备 — 随处可用。
 
 ## 📦 安装
@@ -78,7 +81,7 @@ npm install @zvec/zvec
 
 ### 🛠️ 源码构建
 
-如需从源码构建 Zvec，请参考[源码构建指南](https://zvec.org/en/docs/build/)。
+如需从源码构建 Zvec，请参考[源码构建指南](https://zvec.org/en/docs/db/build/)。
 
 ## ⚡ 一分钟上手
 
@@ -116,7 +119,7 @@ Zvec 提供极致的速度和效率，能够轻松应对高要求的生产环境
 
 <img src="https://zvec.oss-cn-hongkong.aliyuncs.com/qps_10M.svg" width="800" alt="Zvec 性能基准测试" />
 
-有关具体的测试方法、配置及完整结果，请参阅[性能报告](https://zvec.org/en/docs/benchmarks/)。
+有关具体的测试方法、配置及完整结果，请参阅[性能报告](https://zvec.org/en/docs/db/benchmarks/)。
 
 ## 🤝 加入社区
 
