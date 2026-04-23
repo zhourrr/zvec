@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <string>
 #include <zvec/ailego/io/file.h>
+#include <zvec/ailego/logger/logger.h>
 #include <zvec/ailego/utility/file_helper.h>
 #include <zvec/ailego/utility/string_helper.h>
 
@@ -267,6 +268,34 @@ class FileHelper {
   static void CleanupDirectory(const std::string &backup_dir,
                                size_t max_backup_count,
                                const char *prefix_name);
+
+  //! Remove a stale file at `path` if it exists (crash residue cleanup).
+  //! Returns true if the path is clean (did not exist, or was successfully
+  //! removed).
+  static bool EnsureCleanFilePath(const std::string &path) {
+    if (FileExists(path)) {
+      LOG_WARN(
+          "File [%s] already exists (possible crash residue); "
+          "cleaning and overwriting.",
+          path.c_str());
+      return RemoveFile(path);
+    }
+    return true;
+  }
+
+  //! Remove a stale directory at `path` if it exists (crash residue cleanup).
+  //! Returns true if the path is clean (did not exist, or was successfully
+  //! removed).
+  static bool EnsureCleanDirectoryPath(const std::string &path) {
+    if (DirectoryExists(path)) {
+      LOG_WARN(
+          "Directory [%s] already exists (possible crash residue); "
+          "cleaning and overwriting.",
+          path.c_str());
+      return RemoveDirectory(path);
+    }
+    return true;
+  }
 
   static const std::string BACKUP_SUFFIX;
   static const std::string RECOVER_SUFFIX;

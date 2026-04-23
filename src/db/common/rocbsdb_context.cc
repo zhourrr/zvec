@@ -398,6 +398,19 @@ Status RocksdbContext::create_checkpoint(const std::string &checkpoint_dir) {
     return Status::InternalError();
   }
 
+  if (FILE::IsExist(checkpoint_dir)) {
+    LOG_WARN(
+        "Checkpoint directory [%s] already exists (possible crash residue); "
+        "cleaning and overwriting.",
+        checkpoint_dir.c_str());
+    if (!FILE::RemoveDirectory(checkpoint_dir)) {
+      LOG_ERROR("Failed to remove stale checkpoint directory [%s]",
+                checkpoint_dir.c_str());
+      delete cp;
+      return Status::InternalError();
+    }
+  }
+
   if (auto s = cp->CreateCheckpoint(checkpoint_dir); s.ok()) {
     LOG_DEBUG("Created a checkpoint of Rocksdb[%s] to [%s]", db_path_.c_str(),
               checkpoint_dir.c_str());

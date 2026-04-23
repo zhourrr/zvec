@@ -426,7 +426,8 @@ TEST_F(WalFileTest, TestFirstErrorCase) {
     record = wal_file->next();
     idx++;
   }
-  ASSERT_EQ(idx, 0);
+  // First record is corrupted but remaining 9 are valid and should be recovered
+  ASSERT_EQ(idx, 9);
   // close
   ret = wal_file->close();
   ASSERT_EQ(ret, 0);
@@ -486,7 +487,8 @@ TEST_F(WalFileTest, TestMiddleErrorCase) {
     record = wal_file->next();
     idx++;
   }
-  ASSERT_EQ(idx, 5);
+  // 5 valid records before corruption + 4 valid records after = 9 total
+  ASSERT_EQ(idx, 9);
   // close
   ret = wal_file->close();
   ASSERT_EQ(ret, 0);
@@ -723,7 +725,8 @@ TEST_F(WalFileTest, TestCRCErrorCase) {
     record = wal_file->next();
     idx++;
   }
-  ASSERT_EQ(idx, 1);
+  // 1 valid record + 1 CRC-corrupted (skipped) + 8 valid records = 9 total
+  ASSERT_EQ(idx, 9);
   // close
   ret = wal_file->close();
   ASSERT_EQ(ret, 0);

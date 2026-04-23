@@ -1631,13 +1631,7 @@ Status SegmentImpl::create_vector_index(
 
     std::string index_file_path = FileHelper::MakeVectorIndexPath(
         path_, column, segment_meta_->id(), block_id);
-    if (FileHelper::FileExists(index_file_path)) {
-      LOG_WARN(
-          "Index file[%s] already exists (possible crash residue); cleaning "
-          "and overwriting.",
-          index_file_path.c_str());
-      FileHelper::RemoveFile(index_file_path);
-    }
+    FileHelper::EnsureCleanFilePath(index_file_path);
     auto vector_indexer = merge_vector_indexer(
         index_file_path, column, *field_with_new_index_params, concurrency);
     if (!vector_indexer.has_value()) {
@@ -1675,13 +1669,7 @@ Status SegmentImpl::create_vector_index(
 
       std::string index_file_path = FileHelper::MakeVectorIndexPath(
           path_, column, segment_meta_->id(), block_id);
-      if (FileHelper::FileExists(index_file_path)) {
-        LOG_WARN(
-            "Index file[%s] already exists (possible crash residue); cleaning "
-            "and overwriting.",
-            index_file_path.c_str());
-        FileHelper::RemoveFile(index_file_path);
-      }
+      FileHelper::EnsureCleanFilePath(index_file_path);
       auto vector_indexer = merge_vector_indexer(index_file_path, column,
                                                  *field_with_flat, concurrency);
       if (!vector_indexer.has_value()) {
@@ -1714,13 +1702,7 @@ Status SegmentImpl::create_vector_index(
 
       std::string index_file_path = FileHelper::MakeQuantizeVectorIndexPath(
           path_, column, segment_meta_->id(), quant_block_id);
-      if (FileHelper::FileExists(index_file_path)) {
-        LOG_WARN(
-            "Index file[%s] already exists (possible crash residue); cleaning "
-            "and overwriting.",
-            index_file_path.c_str());
-        FileHelper::RemoveFile(index_file_path);
-      }
+      FileHelper::EnsureCleanFilePath(index_file_path);
       auto vector_indexer = merge_vector_indexer(
           index_file_path, column, *field_with_new_index_params, concurrency);
       if (!vector_indexer.has_value()) {
@@ -1793,13 +1775,7 @@ Status SegmentImpl::create_vector_index(
 
       std::string index_file_path = FileHelper::MakeQuantizeVectorIndexPath(
           path_, column, segment_meta_->id(), quant_block_id);
-      if (FileHelper::FileExists(index_file_path)) {
-        LOG_WARN(
-            "Index file[%s] already exists (possible crash residue); cleaning "
-            "and overwriting.",
-            index_file_path.c_str());
-        FileHelper::RemoveFile(index_file_path);
-      }
+      FileHelper::EnsureCleanFilePath(index_file_path);
       auto vector_indexer = merge_vector_indexer(
           index_file_path, column, *field_with_new_index_params, concurrency);
       if (!vector_indexer.has_value()) {
@@ -1996,6 +1972,7 @@ Status SegmentImpl::create_scalar_index(const std::vector<std::string> &columns,
   auto block_id = allocate_block_id();
   std::string new_invert_index_path =
       FileHelper::MakeInvertIndexPath(path_, id(), block_id);
+  FileHelper::EnsureCleanDirectoryPath(new_invert_index_path);
 
   Status s;
   InvertedIndexer::Ptr new_scalar_indexer{nullptr};
@@ -2123,6 +2100,7 @@ Status SegmentImpl::drop_scalar_index(const std::vector<std::string> &columns,
   auto block_id = allocate_block_id();
   std::string new_invert_index_path =
       FileHelper::MakeInvertIndexPath(path_, id(), block_id);
+  FileHelper::EnsureCleanDirectoryPath(new_invert_index_path);
   auto s = invert_indexers_->create_snapshot(new_invert_index_path);
   CHECK_RETURN_STATUS(s);
 
@@ -3945,6 +3923,7 @@ Status SegmentImpl::load_scalar_index_blocks(bool create) {
   if (create) {
     auto block_id = allocate_block_id();
     auto invert_path = FileHelper::MakeInvertIndexPath(path_, id(), block_id);
+    FileHelper::EnsureCleanDirectoryPath(invert_path);
     auto collection_name = collection_schema_->name();
     invert_indexers_ = InvertedIndexer::CreateAndOpen(
         collection_name, invert_path, true, fields, options_.read_only_);
@@ -4063,13 +4042,7 @@ VectorColumnIndexer::Ptr SegmentImpl::create_vector_indexer(
     memory_vector_block_ids_[field_name] = block_id;
   }
 
-  if (FileHelper::FileExists(index_file_path)) {
-    LOG_WARN(
-        "Index file[%s] already exists (possible crash residue); cleaning and "
-        "overwriting.",
-        index_file_path.c_str());
-    FileHelper::RemoveFile(index_file_path);
-  }
+  FileHelper::EnsureCleanFilePath(index_file_path);
 
   auto vector_indexer =
       std::make_shared<VectorColumnIndexer>(index_file_path, field);
@@ -4090,13 +4063,7 @@ Status SegmentImpl::init_memory_components() {
   // create and open memory forward block
   auto mem_path = FileHelper::MakeForwardBlockPath(seg_path_, mem_block.id_,
                                                    !options_.enable_mmap_);
-  if (FileHelper::FileExists(mem_path)) {
-    LOG_WARN(
-        "ForwardBlock file[%s] already exists (possible crash residue); "
-        "cleaning and overwriting.",
-        mem_path.c_str());
-    FileHelper::RemoveFile(mem_path);
-  }
+  FileHelper::EnsureCleanFilePath(mem_path);
   memory_store_ = std::make_shared<MemForwardStore>(
       collection_schema_, mem_path,
       options_.enable_mmap_ ? FileFormat::IPC : FileFormat::PARQUET,
@@ -4215,19 +4182,19 @@ Status SegmentImpl::recover() {
     Status status;
     switch (doc->get_operator()) {
       case Operator::INSERT: {
-        internal_insert(*doc);
+        status = internal_insert(*doc);
         break;
       }
       case Operator::UPDATE: {
-        internal_update(*doc);
+        status = internal_update(*doc);
         break;
       }
       case Operator::UPSERT: {
-        internal_upsert(*doc);
+        status = internal_upsert(*doc);
         break;
       }
       case Operator::DELETE: {
-        internal_delete(*doc);
+        status = internal_delete(*doc);
         break;
       }
       default:
@@ -4248,11 +4215,6 @@ Status SegmentImpl::recover() {
     recovered_doc_count[static_cast<size_t>(doc->get_operator())]++;
   }
 
-  const auto added_docs = recovered_doc_count[0] +  // INSERT
-                          recovered_doc_count[1] +  // UPSERT
-                          recovered_doc_count[2];   // UPDATE
-  mem_block.max_doc_id_ += added_docs;
-
   LOG_INFO(
       "WAL recovery completed [%s]: segment[%d], total_recovered[%zu] "
       "(insert[%zu], upsert[%zu], update[%zu], delete[%zu])",
@@ -4271,6 +4233,7 @@ Status SegmentImpl::open_wal_file() {
   std::string wal_file_path =
       FileHelper::MakeWalPath(path_, segment_meta_->id(), mem_block.id_);
   WalOptions wal_option;
+  wal_option.max_docs_wal_flush = 1;  // fsync after every append for durability
   if (std::filesystem::exists(wal_file_path)) {
     wal_option.create_new = false;
   } else {

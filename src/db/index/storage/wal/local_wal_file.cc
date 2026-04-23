@@ -50,21 +50,25 @@ int LocalWalFile::append(std::string &&data) {
 }
 
 std::string LocalWalFile::next() {
-  WalRecord record;
-  if (read_record(record) > 0) {
+  while (true) {
+    WalRecord record;
+    int ret = read_record(record);
+    if (ret <= 0) {
+      // EOF (0) or read error (-1) -- cannot continue
+      return std::string();
+    }
     uint32_t tmp_crc = ailego::Crc32c::Hash(
         reinterpret_cast<const void *>(record.content_.data()), record.length_,
         0);
     if (tmp_crc == record.crc_) {
       return std::move(record.content_);
-    } else {
-      WLOG_ERROR(
-          "Wal next error. record.length_[%zu] crc_[%zu] != tmp_crc[%zu]",
-          (size_t)record.length_, (size_t)record.crc_, (size_t)tmp_crc);
     }
+    // CRC mismatch -- skip corrupted record and try next
+    WLOG_ERROR(
+        "Wal next: CRC mismatch, skipping corrupted record. "
+        "record.length_[%zu] stored_crc[%zu] != computed_crc[%zu]",
+        (size_t)record.length_, (size_t)record.crc_, (size_t)tmp_crc);
   }
-  // end of file or read error
-  return std::string();
 }
 
 int LocalWalFile::open(const WalOptions &wal_option) {
@@ -85,6 +89,13 @@ int LocalWalFile::open(const WalOptions &wal_option) {
     int write_size = file_.write((const void *)&header_, sizeof(header_));
     if (write_size != sizeof(header_)) {
       WLOG_ERROR("Wal write header error. create_new[%d]",
+                 wal_option.create_new);
+      return -1;
+    }
+
+    // fsync header to disk to ensure WAL file is valid after crash
+    if (!file_.flush()) {
+      WLOG_ERROR("Wal header fsync error. create_new[%d]",
                  wal_option.create_new);
       return -1;
     }
@@ -161,37 +172,25 @@ int LocalWalFile::prepare_for_read() {
 int LocalWalFile::write_record(WalRecord &record) {
   CHECK_STATUS(opened_, true);
 
-  int write_size = 0;
-  int ret = -1;
+  // Assemble the full record (length + CRC + content) into a contiguous buffer
+  // and write it in a single call to avoid partial records on crash
+  const size_t total_size = LENGTH_SIZE + CRC_SIZE + record.length_;
+  std::string buf;
+  buf.reserve(total_size);
+  buf.append(reinterpret_cast<const char *>(&record.length_), LENGTH_SIZE);
+  buf.append(reinterpret_cast<const char *>(&record.crc_), CRC_SIZE);
+  buf.append(record.content_.data(), record.length_);
 
   std::lock_guard<std::mutex> lock(file_mutex_);
-  do {
-    write_size = file_.write((const void *)&record.length_, LENGTH_SIZE);
-    if (write_size != LENGTH_SIZE) {
-      WLOG_ERROR("Wal write error. record.length_ error write_size[%d]",
-                 write_size);
-      break;
-    }
+  int write_size = file_.write(buf.data(), total_size);
+  if (write_size != static_cast<int>(total_size)) {
+    WLOG_ERROR("Wal write error. expected[%zu] write_size[%d]", total_size,
+               write_size);
+    return -1;
+  }
 
-    write_size = file_.write((const void *)&record.crc_, CRC_SIZE);
-    if (write_size != CRC_SIZE) {
-      WLOG_ERROR("Wal write error. record.crc_ error write_size[%d]",
-                 write_size);
-      break;
-    }
-
-    write_size =
-        file_.write((const void *)record.content_.data(), record.length_);
-    if (write_size != (int)record.length_) {
-      WLOG_ERROR("Wal write error. record.content_ error write_size[%d]",
-                 write_size);
-      break;
-    }
-    ret = 1;  // write one record success
-    docs_count_++;
-  } while (false);
-
-  return ret;
+  docs_count_++;
+  return 1;
 }
 
 //! Return 1 if success or 0 if eof or -1 if read error
