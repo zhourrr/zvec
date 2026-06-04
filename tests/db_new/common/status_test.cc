@@ -12,59 +12,173 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "zvec/db/status.h"
 
+#include "zvec/db/status.h"
 #include <sstream>
 #include <string>
-
+#include <utility>
 #include <gtest/gtest.h>
+
 
 using namespace zvec;
 
-TEST(StatusTest, OkStatusHasStableCodeAndEmptyMessage) {
-  const Status status;
+
+TEST(StatusTest, DefaultConstructor) {
+  Status status;
 
   EXPECT_TRUE(status.ok());
-  EXPECT_EQ(StatusCode::OK, status.code());
-  EXPECT_TRUE(status.message().empty());
-  EXPECT_STREQ("", status.c_str());
-  EXPECT_STREQ("OK", GetDefaultMessage(status.code()));
+  EXPECT_EQ(status.code(), StatusCode::OK);
+  EXPECT_EQ(status.message(), "");
 }
 
-TEST(StatusTest, FactoryMethodsPreserveCodeAndMessage) {
-  const auto invalid = Status::InvalidArgument("field ", "age", " expected ",
-                                               42);
-  const auto missing = Status::NotFound("collection ", "users");
-  const auto duplicate = Status::AlreadyExists("pk ", "001");
 
-  EXPECT_FALSE(invalid.ok());
-  EXPECT_EQ(StatusCode::INVALID_ARGUMENT, invalid.code());
-  EXPECT_EQ("field age expected 42", invalid.message());
+TEST(StatusTest, ConstructorWithCodeAndMessage) {
+  std::string message = "Test error message";
+  Status status(StatusCode::INVALID_ARGUMENT, message);
 
-  EXPECT_EQ(StatusCode::NOT_FOUND, missing.code());
-  EXPECT_EQ("collection users", missing.message());
-
-  EXPECT_EQ(StatusCode::ALREADY_EXISTS, duplicate.code());
-  EXPECT_EQ("pk 001", duplicate.message());
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), StatusCode::INVALID_ARGUMENT);
+  EXPECT_EQ(status.message(), message);
 }
 
-TEST(StatusTest, EqualityUsesMessageForFailuresOnly) {
-  EXPECT_EQ(Status::OK(), Status());
-  EXPECT_EQ(Status(), Status(StatusCode::OK, "ignored for ok"));
 
-  EXPECT_EQ(Status::NotFound("same"), Status::NotFound("same"));
-  EXPECT_NE(Status::NotFound("left"), Status::NotFound("right"));
-  EXPECT_NE(Status::NotFound("same"), Status::InvalidArgument("same"));
+TEST(StatusTest, ConstructorWithRvalueMessage) {
+  Status status(StatusCode::NOT_FOUND, std::string("Test error message"));
+
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), StatusCode::NOT_FOUND);
+  EXPECT_EQ(status.message(), "Test error message");
 }
 
-TEST(StatusTest, StreamOutputIsReadable) {
-  std::ostringstream ok_stream;
-  ok_stream << Status::OK();
-  EXPECT_EQ("OK", ok_stream.str());
 
+TEST(StatusTest, CopyConstructor) {
+  Status original(StatusCode::INTERNAL_ERROR, "Copy test");
+  Status copy(original);
+
+  EXPECT_FALSE(copy.ok());
+  EXPECT_EQ(copy.code(), StatusCode::INTERNAL_ERROR);
+  EXPECT_EQ(copy.message(), "Copy test");
+  EXPECT_EQ(copy, original);
+}
+
+
+TEST(StatusTest, CopyAssignment) {
+  Status original(StatusCode::PERMISSION_DENIED, "Assignment test");
+  Status assigned;
+
+  assigned = original;
+
+  EXPECT_FALSE(assigned.ok());
+  EXPECT_EQ(assigned.code(), StatusCode::PERMISSION_DENIED);
+  EXPECT_EQ(assigned.message(), "Assignment test");
+  EXPECT_EQ(assigned, original);
+}
+
+
+TEST(StatusTest, MoveConstructor) {
+  Status original(StatusCode::RESOURCE_EXHAUSTED, "Move test");
+  Status moved(std::move(original));
+
+  EXPECT_FALSE(moved.ok());
+  EXPECT_EQ(moved.code(), StatusCode::RESOURCE_EXHAUSTED);
+  EXPECT_EQ(moved.message(), "Move test");
+}
+
+
+TEST(StatusTest, MoveAssignment) {
+  Status original(StatusCode::UNAVAILABLE, "Move assignment test");
+  Status moved;
+
+  moved = std::move(original);
+
+  EXPECT_FALSE(moved.ok());
+  EXPECT_EQ(moved.code(), StatusCode::UNAVAILABLE);
+  EXPECT_EQ(moved.message(), "Move assignment test");
+}
+
+
+TEST(StatusTest, ComparisonOperators) {
+  Status status1(StatusCode::INVALID_ARGUMENT, "Error 1");
+  Status status2(StatusCode::INVALID_ARGUMENT, "Error 1");
+  Status status3(StatusCode::NOT_FOUND, "Error 2");
+  Status ok1;
+  Status ok2;
+  Status ok_with_message(StatusCode::OK, "ignored");
+
+  EXPECT_TRUE(status1 == status2);
+  EXPECT_FALSE(status1 == status3);
+  EXPECT_TRUE(ok1 == ok2);
+  EXPECT_TRUE(ok1 == ok_with_message);
+  EXPECT_FALSE(status1 == ok1);
+
+  EXPECT_FALSE(status1 != status2);
+  EXPECT_TRUE(status1 != status3);
+  EXPECT_FALSE(ok1 != ok2);
+  EXPECT_FALSE(ok1 != ok_with_message);
+  EXPECT_TRUE(status1 != ok1);
+}
+
+
+TEST(StatusTest, FactoryMethods) {
+  auto ok = Status::OK();
+  EXPECT_TRUE(ok.ok());
+  EXPECT_EQ(ok.code(), StatusCode::OK);
+  EXPECT_EQ(ok.message(), "");
+
+  auto invalid_arg = Status::InvalidArgument("Invalid arg: ", 42);
+  EXPECT_FALSE(invalid_arg.ok());
+  EXPECT_EQ(invalid_arg.code(), StatusCode::INVALID_ARGUMENT);
+  EXPECT_EQ(invalid_arg.message(), "Invalid arg: 42");
+
+  auto not_found = Status::NotFound("Not found: ", "key");
+  EXPECT_FALSE(not_found.ok());
+  EXPECT_EQ(not_found.code(), StatusCode::NOT_FOUND);
+  EXPECT_EQ(not_found.message(), "Not found: key");
+
+  auto already_exists = Status::AlreadyExists("Already exists: ", "item");
+  EXPECT_FALSE(already_exists.ok());
+  EXPECT_EQ(already_exists.code(), StatusCode::ALREADY_EXISTS);
+  EXPECT_EQ(already_exists.message(), "Already exists: item");
+
+  auto internal_error = Status::InternalError("Internal error: ", "details");
+  EXPECT_FALSE(internal_error.ok());
+  EXPECT_EQ(internal_error.code(), StatusCode::INTERNAL_ERROR);
+  EXPECT_EQ(internal_error.message(), "Internal error: details");
+
+  auto permission_denied =
+      Status::PermissionDenied("Permission denied for: ", "resource");
+  EXPECT_FALSE(permission_denied.ok());
+  EXPECT_EQ(permission_denied.code(), StatusCode::PERMISSION_DENIED);
+  EXPECT_EQ(permission_denied.message(), "Permission denied for: resource");
+
+  auto not_supported = Status::NotSupported("Not supported: ", "feature");
+  EXPECT_FALSE(not_supported.ok());
+  EXPECT_EQ(not_supported.code(), StatusCode::NOT_SUPPORTED);
+  EXPECT_EQ(not_supported.message(), "Not supported: feature");
+}
+
+
+TEST(StatusTest, CStringConversion) {
+  Status status(StatusCode::UNKNOWN, "C string test");
+  Status ok_status;
+
+  EXPECT_STREQ(status.c_str(), "C string test");
+  EXPECT_STREQ(ok_status.c_str(), "");
+}
+
+
+TEST(StatusTest, OutputStreamOperator) {
+  Status status(StatusCode::INVALID_ARGUMENT, "Stream test");
   std::ostringstream error_stream;
-  error_stream << Status::PermissionDenied("readonly");
+  error_stream << status;
 
-  EXPECT_NE(std::string::npos, error_stream.str().find("Permission denied"));
-  EXPECT_NE(std::string::npos, error_stream.str().find("readonly"));
+  EXPECT_NE(
+      error_stream.str().find(GetDefaultMessage(StatusCode::INVALID_ARGUMENT)),
+      std::string::npos);
+  EXPECT_NE(error_stream.str().find("Stream test"), std::string::npos);
+
+  Status ok_status;
+  std::ostringstream ok_stream;
+  ok_stream << ok_status;
+  EXPECT_EQ(ok_stream.str(), "OK");
 }
