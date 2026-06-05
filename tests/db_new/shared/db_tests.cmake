@@ -4,6 +4,7 @@ include(${PROJECT_ROOT_DIR}/cmake/option.cmake)
 
 set(ZVEC_DB_TEST_LIBS
   zvec_db
+  zvec_proto
   # Vector index implementations register themselves through static factory
   # initializers.  Keep these targets explicit so collection/segment tests can
   # create vector indexes through the normal db path.

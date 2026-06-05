@@ -2,5 +2,4 @@ include(${PROJECT_ROOT_DIR}/cmake/bazel.cmake)
 include(${PROJECT_ROOT_DIR}/cmake/option.cmake)
 
 
-cc_directories(common)
-cc_directories(index)
+cc_directories(segment)
