@@ -30,6 +30,10 @@ constexpr uint32_t kDefaultDenseVectorDimension = 128;
 constexpr uint32_t kDefaultSparseVectorDimension = 128;
 constexpr uint32_t kDefaultQuantizedVectorDimension = 128;
 constexpr uint32_t kMinRabitqVectorDimension = 64;
+constexpr const char *kDenseVectorFieldName = "dense_fp32";
+constexpr const char *kSparseVectorFieldName = "sparse_fp32";
+constexpr const char *kQuantizedVectorFieldName = "quantized_dense_fp32";
+constexpr const char *kFtsFieldName = "content";
 
 
 inline IndexParams::Ptr MakeScalarIndexParams(
@@ -74,8 +78,8 @@ inline IndexParams::Ptr MakeIVFIndexParams(
     MetricType metric_type = MetricType::IP, int n_list = 1024,
     int n_iters = 10, bool use_soar = false,
     QuantizeType quantize_type = QuantizeType::UNDEFINED) {
-  return std::make_shared<IVFIndexParams>(
-      metric_type, n_list, n_iters, use_soar, quantize_type);
+  return std::make_shared<IVFIndexParams>(metric_type, n_list, n_iters,
+                                          use_soar, quantize_type);
 }
 
 
@@ -133,45 +137,41 @@ inline std::vector<IndexParamCase> MakeDenseVectorIndexParamCases() {
       {"flat_ip", MakeFlatIndexParams(MetricType::IP)},
       {"flat_l2", MakeFlatIndexParams(MetricType::L2)},
       {"flat_cosine", MakeFlatIndexParams(MetricType::COSINE)},
-      {"flat_ip_fp16", MakeFlatIndexParams(MetricType::IP,
-                                            QuantizeType::FP16)},
-      {"flat_ip_int8", MakeFlatIndexParams(MetricType::IP,
-                                            QuantizeType::INT8)},
-      {"flat_ip_int4", MakeFlatIndexParams(MetricType::IP,
-                                            QuantizeType::INT4)},
+      {"flat_ip_fp16", MakeFlatIndexParams(MetricType::IP, QuantizeType::FP16)},
+      {"flat_ip_int8", MakeFlatIndexParams(MetricType::IP, QuantizeType::INT8)},
+      {"flat_ip_int4", MakeFlatIndexParams(MetricType::IP, QuantizeType::INT4)},
       {"hnsw_ip", MakeHnswIndexParams(MetricType::IP)},
       {"hnsw_l2", MakeHnswIndexParams(MetricType::L2)},
       {"hnsw_cosine", MakeHnswIndexParams(MetricType::COSINE)},
-      {"hnsw_ip_fp16", MakeHnswIndexParams(MetricType::IP, 16, 100,
-                                           QuantizeType::FP16)},
-      {"hnsw_ip_int8", MakeHnswIndexParams(MetricType::IP, 16, 100,
-                                           QuantizeType::INT8)},
-      {"hnsw_ip_int4", MakeHnswIndexParams(MetricType::IP, 16, 100,
-                                           QuantizeType::INT4)},
+      {"hnsw_ip_fp16",
+       MakeHnswIndexParams(MetricType::IP, 16, 100, QuantizeType::FP16)},
+      {"hnsw_ip_int8",
+       MakeHnswIndexParams(MetricType::IP, 16, 100, QuantizeType::INT8)},
+      {"hnsw_ip_int4",
+       MakeHnswIndexParams(MetricType::IP, 16, 100, QuantizeType::INT4)},
       {"ivf_ip", MakeIVFIndexParams(MetricType::IP, 1024, 10, false)},
       {"ivf_ip_soar", MakeIVFIndexParams(MetricType::IP, 1024, 10, true)},
       {"ivf_l2", MakeIVFIndexParams(MetricType::L2, 1024, 10, false)},
-      {"ivf_cosine", MakeIVFIndexParams(MetricType::COSINE, 1024, 10,
-                                         false)},
-      {"ivf_ip_fp16", MakeIVFIndexParams(MetricType::IP, 1024, 10, false,
-                                         QuantizeType::FP16)},
-      {"ivf_ip_int8", MakeIVFIndexParams(MetricType::IP, 1024, 10, false,
-                                         QuantizeType::INT8)},
+      {"ivf_cosine", MakeIVFIndexParams(MetricType::COSINE, 1024, 10, false)},
+      {"ivf_ip_fp16",
+       MakeIVFIndexParams(MetricType::IP, 1024, 10, false, QuantizeType::FP16)},
+      {"ivf_ip_int8",
+       MakeIVFIndexParams(MetricType::IP, 1024, 10, false, QuantizeType::INT8)},
       {"vamana_ip", MakeVamanaIndexParams(MetricType::IP)},
-      {"vamana_ip_fp16", MakeVamanaIndexParams(
-                             MetricType::IP,
+      {"vamana_ip_fp16",
+       MakeVamanaIndexParams(MetricType::IP,
                              core_interface::kDefaultVamanaMaxDegree,
                              core_interface::kDefaultVamanaSearchListSize,
                              core_interface::kDefaultVamanaAlpha,
-                             core_interface::kDefaultVamanaSaturateGraph,
-                             false, false, QuantizeType::FP16)},
+                             core_interface::kDefaultVamanaSaturateGraph, false,
+                             false, QuantizeType::FP16)},
   };
 
 #if DISKANN_SUPPORTED
   cases.push_back({"diskann_ip", MakeDiskAnnIndexParams(MetricType::IP)});
-  cases.push_back({"diskann_ip_fp16",
-                   MakeDiskAnnIndexParams(MetricType::IP, 100, 50, 0,
-                                          QuantizeType::FP16)});
+  cases.push_back(
+      {"diskann_ip_fp16",
+       MakeDiskAnnIndexParams(MetricType::IP, 100, 50, 0, QuantizeType::FP16)});
 #endif
 
 #if RABITQ_SUPPORTED
@@ -188,17 +188,37 @@ inline std::vector<IndexParamCase> MakeDenseVectorIndexParamCases() {
 }
 
 
+inline std::vector<IndexParamCase> MakeDenseVectorRecallIndexParamCases() {
+  std::vector<IndexParamCase> cases = {
+      {"flat_l2", MakeFlatIndexParams(MetricType::L2)},
+      {"hnsw_l2", MakeHnswIndexParams(MetricType::L2)},
+      {"ivf_l2", MakeIVFIndexParams(MetricType::L2, 1024, 10, false)},
+      {"vamana_l2", MakeVamanaIndexParams(MetricType::L2)},
+  };
+
+#if DISKANN_SUPPORTED
+  cases.push_back({"diskann_l2", MakeDiskAnnIndexParams(MetricType::L2)});
+#endif
+
+#if RABITQ_SUPPORTED
+  cases.push_back({"hnsw_rabitq_l2", MakeHnswRabitqIndexParams(MetricType::L2),
+                   kDefaultDenseVectorDimension});
+#endif
+
+  return cases;
+}
+
+
 inline std::vector<IndexParamCase> MakeSparseVectorIndexParamCases() {
   return {
       {"flat_ip", MakeFlatIndexParams(MetricType::IP),
        kDefaultSparseVectorDimension},
-      {"flat_ip_fp16", MakeFlatIndexParams(MetricType::IP,
-                                            QuantizeType::FP16),
+      {"flat_ip_fp16", MakeFlatIndexParams(MetricType::IP, QuantizeType::FP16),
        kDefaultSparseVectorDimension},
       {"hnsw_ip", MakeHnswIndexParams(MetricType::IP),
        kDefaultSparseVectorDimension},
-      {"hnsw_ip_fp16", MakeHnswIndexParams(MetricType::IP, 16, 100,
-                                           QuantizeType::FP16),
+      {"hnsw_ip_fp16",
+       MakeHnswIndexParams(MetricType::IP, 16, 100, QuantizeType::FP16),
        kDefaultSparseVectorDimension},
   };
 }
@@ -206,28 +226,25 @@ inline std::vector<IndexParamCase> MakeSparseVectorIndexParamCases() {
 
 inline std::vector<IndexParamCase> MakeQuantizedVectorIndexParamCases() {
   std::vector<IndexParamCase> cases = {
-      {"flat_ip_fp16", MakeFlatIndexParams(MetricType::IP,
-                                            QuantizeType::FP16)},
-      {"flat_ip_int8", MakeFlatIndexParams(MetricType::IP,
-                                            QuantizeType::INT8)},
-      {"flat_ip_int4", MakeFlatIndexParams(MetricType::IP,
-                                            QuantizeType::INT4)},
-      {"hnsw_ip_fp16", MakeHnswIndexParams(MetricType::IP, 16, 100,
-                                           QuantizeType::FP16)},
-      {"hnsw_ip_int8", MakeHnswIndexParams(MetricType::IP, 16, 100,
-                                           QuantizeType::INT8)},
-      {"hnsw_ip_int4", MakeHnswIndexParams(MetricType::IP, 16, 100,
-                                           QuantizeType::INT4)},
-      {"ivf_ip_fp16", MakeIVFIndexParams(MetricType::IP, 1024, 10, false,
-                                         QuantizeType::FP16)},
-      {"ivf_ip_int8", MakeIVFIndexParams(MetricType::IP, 1024, 10, false,
-                                         QuantizeType::INT8)},
+      {"flat_ip_fp16", MakeFlatIndexParams(MetricType::IP, QuantizeType::FP16)},
+      {"flat_ip_int8", MakeFlatIndexParams(MetricType::IP, QuantizeType::INT8)},
+      {"flat_ip_int4", MakeFlatIndexParams(MetricType::IP, QuantizeType::INT4)},
+      {"hnsw_ip_fp16",
+       MakeHnswIndexParams(MetricType::IP, 16, 100, QuantizeType::FP16)},
+      {"hnsw_ip_int8",
+       MakeHnswIndexParams(MetricType::IP, 16, 100, QuantizeType::INT8)},
+      {"hnsw_ip_int4",
+       MakeHnswIndexParams(MetricType::IP, 16, 100, QuantizeType::INT4)},
+      {"ivf_ip_fp16",
+       MakeIVFIndexParams(MetricType::IP, 1024, 10, false, QuantizeType::FP16)},
+      {"ivf_ip_int8",
+       MakeIVFIndexParams(MetricType::IP, 1024, 10, false, QuantizeType::INT8)},
   };
 
 #if DISKANN_SUPPORTED
-  cases.push_back({"diskann_ip_fp16",
-                   MakeDiskAnnIndexParams(MetricType::IP, 100, 50, 0,
-                                          QuantizeType::FP16)});
+  cases.push_back(
+      {"diskann_ip_fp16",
+       MakeDiskAnnIndexParams(MetricType::IP, 100, 50, 0, QuantizeType::FP16)});
 #endif
 
 #if RABITQ_SUPPORTED
@@ -346,58 +363,58 @@ inline void AddScalarAndArrayFields(const CollectionSchema::Ptr &schema,
 
   AddField(schema, std::make_shared<FieldSchema>(
                        "id", DataType::INT32, options.nullable, index_params));
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "name", DataType::STRING, options.nullable,
-                       index_params));
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "age", DataType::UINT32, options.nullable,
-                       index_params));
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "enabled", DataType::BOOL, options.nullable,
-                       index_params));
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "count", DataType::INT64, options.nullable,
-                       index_params));
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "rank", DataType::UINT64, options.nullable,
-                       index_params));
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "score", DataType::FLOAT, options.nullable,
-                       index_params));
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "rating", DataType::DOUBLE, options.nullable,
-                       index_params));
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "binary", DataType::BINARY, options.nullable,
-                       index_params));
+  AddField(schema,
+           std::make_shared<FieldSchema>("name", DataType::STRING,
+                                         options.nullable, index_params));
+  AddField(schema,
+           std::make_shared<FieldSchema>("age", DataType::UINT32,
+                                         options.nullable, index_params));
+  AddField(schema,
+           std::make_shared<FieldSchema>("enabled", DataType::BOOL,
+                                         options.nullable, index_params));
+  AddField(schema,
+           std::make_shared<FieldSchema>("count", DataType::INT64,
+                                         options.nullable, index_params));
+  AddField(schema,
+           std::make_shared<FieldSchema>("rank", DataType::UINT64,
+                                         options.nullable, index_params));
+  AddField(schema,
+           std::make_shared<FieldSchema>("score", DataType::FLOAT,
+                                         options.nullable, index_params));
+  AddField(schema,
+           std::make_shared<FieldSchema>("rating", DataType::DOUBLE,
+                                         options.nullable, index_params));
+  AddField(schema,
+           std::make_shared<FieldSchema>("binary", DataType::BINARY,
+                                         options.nullable, index_params));
 
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "array_binary", DataType::ARRAY_BINARY,
-                       options.nullable, index_params));
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "array_string", DataType::ARRAY_STRING,
-                       options.nullable, index_params));
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "array_bool", DataType::ARRAY_BOOL, options.nullable,
-                       index_params));
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "array_int32", DataType::ARRAY_INT32, options.nullable,
-                       index_params));
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "array_int64", DataType::ARRAY_INT64, options.nullable,
-                       index_params));
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "array_uint32", DataType::ARRAY_UINT32,
-                       options.nullable, index_params));
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "array_uint64", DataType::ARRAY_UINT64,
-                       options.nullable, index_params));
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "array_float", DataType::ARRAY_FLOAT, options.nullable,
-                       index_params));
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "array_double", DataType::ARRAY_DOUBLE,
-                       options.nullable, index_params));
+  AddField(schema,
+           std::make_shared<FieldSchema>("array_binary", DataType::ARRAY_BINARY,
+                                         options.nullable, index_params));
+  AddField(schema,
+           std::make_shared<FieldSchema>("array_string", DataType::ARRAY_STRING,
+                                         options.nullable, index_params));
+  AddField(schema,
+           std::make_shared<FieldSchema>("array_bool", DataType::ARRAY_BOOL,
+                                         options.nullable, index_params));
+  AddField(schema,
+           std::make_shared<FieldSchema>("array_int32", DataType::ARRAY_INT32,
+                                         options.nullable, index_params));
+  AddField(schema,
+           std::make_shared<FieldSchema>("array_int64", DataType::ARRAY_INT64,
+                                         options.nullable, index_params));
+  AddField(schema,
+           std::make_shared<FieldSchema>("array_uint32", DataType::ARRAY_UINT32,
+                                         options.nullable, index_params));
+  AddField(schema,
+           std::make_shared<FieldSchema>("array_uint64", DataType::ARRAY_UINT64,
+                                         options.nullable, index_params));
+  AddField(schema,
+           std::make_shared<FieldSchema>("array_float", DataType::ARRAY_FLOAT,
+                                         options.nullable, index_params));
+  AddField(schema,
+           std::make_shared<FieldSchema>("array_double", DataType::ARRAY_DOUBLE,
+                                         options.nullable, index_params));
 }
 
 
@@ -412,35 +429,36 @@ inline void AddScalarAnchors(const CollectionSchema::Ptr &schema,
 
 inline void AddDenseVectorField(const CollectionSchema::Ptr &schema,
                                 const SchemaOptions &options) {
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "dense_fp32", DataType::VECTOR_FP32,
-                       options.dense_vector_dimension, false,
-                       DenseVectorIndexParamsFor(options)));
+  AddField(schema,
+           std::make_shared<FieldSchema>(
+               kDenseVectorFieldName, DataType::VECTOR_FP32,
+               options.dense_vector_dimension, false,
+               DenseVectorIndexParamsFor(options)));
 }
 
 
 inline void AddFlatDenseFp16VectorField(const CollectionSchema::Ptr &schema,
                                         const SchemaOptions &options) {
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "dense_fp16", DataType::VECTOR_FP16,
-                       options.dense_vector_dimension, false,
-                       MakeFlatIndexParams(MetricType::IP)));
+  AddField(schema,
+           std::make_shared<FieldSchema>("dense_fp16", DataType::VECTOR_FP16,
+                                         options.dense_vector_dimension, false,
+                                         MakeFlatIndexParams(MetricType::IP)));
 }
 
 
 inline void AddFlatDenseInt8VectorField(const CollectionSchema::Ptr &schema,
                                         const SchemaOptions &options) {
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "dense_int8", DataType::VECTOR_INT8,
-                       options.dense_vector_dimension, false,
-                       MakeFlatIndexParams(MetricType::IP)));
+  AddField(schema,
+           std::make_shared<FieldSchema>("dense_int8", DataType::VECTOR_INT8,
+                                         options.dense_vector_dimension, false,
+                                         MakeFlatIndexParams(MetricType::IP)));
 }
 
 
 inline void AddSparseVectorField(const CollectionSchema::Ptr &schema,
                                  const SchemaOptions &options) {
   AddField(schema, std::make_shared<FieldSchema>(
-                       "sparse_fp32", DataType::SPARSE_VECTOR_FP32,
+                       kSparseVectorFieldName, DataType::SPARSE_VECTOR_FP32,
                        options.sparse_vector_dimension, false,
                        SparseVectorIndexParamsFor(options)));
 }
@@ -458,7 +476,7 @@ inline void AddFlatSparseFp16VectorField(const CollectionSchema::Ptr &schema,
 inline void AddQuantizedVectorField(const CollectionSchema::Ptr &schema,
                                     const SchemaOptions &options) {
   AddField(schema, std::make_shared<FieldSchema>(
-                       "quantized_dense_fp32", DataType::VECTOR_FP32,
+                       kQuantizedVectorFieldName, DataType::VECTOR_FP32,
                        options.quantized_vector_dimension, false,
                        QuantizedVectorIndexParamsFor(options)));
 }
@@ -466,9 +484,9 @@ inline void AddQuantizedVectorField(const CollectionSchema::Ptr &schema,
 
 inline void AddFtsField(const CollectionSchema::Ptr &schema,
                         const SchemaOptions &options) {
-  AddField(schema, std::make_shared<FieldSchema>(
-                       "content", DataType::STRING, false,
-                       FtsIndexParamsFor(options)));
+  AddField(schema,
+           std::make_shared<FieldSchema>(kFtsFieldName, DataType::STRING, false,
+                                         FtsIndexParamsFor(options)));
 }
 
 
@@ -497,7 +515,8 @@ inline CollectionSchema::Ptr MakeDenseVectorSchema(SchemaOptions options = {}) {
 }
 
 
-inline CollectionSchema::Ptr MakeSparseVectorSchema(SchemaOptions options = {}) {
+inline CollectionSchema::Ptr MakeSparseVectorSchema(
+    SchemaOptions options = {}) {
   auto schema = detail::MakeEmptySchema(options);
   detail::AddScalarAnchors(schema, options);
   detail::AddSparseVectorField(schema, options);
@@ -533,6 +552,71 @@ inline CollectionSchema::Ptr MakeAllTypesSchema(SchemaOptions options = {}) {
   detail::AddQuantizedVectorField(schema, options);
   detail::AddFtsField(schema, options);
   return schema;
+}
+
+
+inline CollectionSchema::Ptr MakeDenseVectorSchemaForIndex(
+    std::string name, const IndexParamCase &index_case,
+    SchemaOptions options = {}) {
+  options.name = std::move(name);
+  options.dense_vector_dimension = index_case.vector_dimension;
+  options.dense_vector_index_params = index_case.index_params;
+  return MakeDenseVectorSchema(std::move(options));
+}
+
+
+inline CollectionSchema::Ptr MakeAllTypesSchemaForDenseVectorIndex(
+    std::string name, const IndexParamCase &index_case,
+    SchemaOptions options = {}) {
+  options.name = std::move(name);
+  options.dense_vector_dimension = index_case.vector_dimension;
+  options.dense_vector_index_params = index_case.index_params;
+  return MakeAllTypesSchema(std::move(options));
+}
+
+
+inline std::vector<CollectionSchema::Ptr> MakeDenseVectorSchemaVariants(
+    const std::string &name_prefix, const IndexParamCase &index_case,
+    SchemaOptions options = {}) {
+  return {
+      MakeDenseVectorSchemaForIndex(
+          name_prefix + "_minimal_" + index_case.name, index_case, options),
+      MakeAllTypesSchemaForDenseVectorIndex(
+          name_prefix + "_all_types_" + index_case.name, index_case, options),
+  };
+}
+
+
+inline std::vector<CollectionSchema::Ptr> MakeDenseVectorSchemas(
+    const std::string &name_prefix,
+    const std::vector<IndexParamCase> &index_cases,
+    SchemaOptions options = {}) {
+  std::vector<CollectionSchema::Ptr> schemas;
+  schemas.reserve(index_cases.size() * 2);
+
+  for (const auto &index_case : index_cases) {
+    auto variants =
+        MakeDenseVectorSchemaVariants(name_prefix, index_case, options);
+    schemas.insert(schemas.end(), variants.begin(), variants.end());
+  }
+
+  return schemas;
+}
+
+
+inline std::vector<CollectionSchema::Ptr> MakeDenseVectorRecallSchemas(
+    SchemaOptions options = {}) {
+  return MakeDenseVectorSchemas("dense_recall",
+                                MakeDenseVectorRecallIndexParamCases(),
+                                std::move(options));
+}
+
+
+inline std::vector<CollectionSchema::Ptr> MakeDenseVectorIndexSchemas(
+    SchemaOptions options = {}) {
+  return MakeDenseVectorSchemas("dense_index",
+                                MakeDenseVectorIndexParamCases(),
+                                std::move(options));
 }
 
 
