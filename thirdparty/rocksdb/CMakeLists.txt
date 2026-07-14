@@ -1,4 +1,14 @@
 set(ROCKSDB_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rocksdb-8.1.1)
+
+# Remove RocksDB's obsolete Bloom filter alias lookup. Besides no longer being
+# needed for zvec-generated SSTs, its function-local hash table is the observed
+# crash site during highly concurrent collection opens. This backports
+# upstream RocksDB commit 44b741e9ccc2a99334806c08e8b09c3ad8010f63.
+set(ROCKSDB_FILTER_ALIAS_PATCH
+    ${CMAKE_CURRENT_SOURCE_DIR}/rocksdb.filter_alias_cleanup.patch)
+apply_patch_once("rocksdb_filter_alias_cleanup" "${ROCKSDB_SRC_DIR}"
+                 "${ROCKSDB_FILTER_ALIAS_PATCH}")
+
 if (ANDROID)
     set(ROCKSDB_ANDROID_PATCH ${CMAKE_CURRENT_SOURCE_DIR}/rocksdb.android.patch)
     apply_patch_once("rocksdb_android_fix" "${ROCKSDB_SRC_DIR}" "${ROCKSDB_ANDROID_PATCH}")
