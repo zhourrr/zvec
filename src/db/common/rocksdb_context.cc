@@ -310,15 +310,16 @@ Status RocksdbContext::close() {
   std::lock_guard<std::mutex> lock(mutex_);
 
   if (db_ == nullptr) {
-    LOG_ERROR("RocksDB[%s] is not opened", db_path_.c_str());
-    return Status::InternalError();
+    return Status::OK();
   }
 
+  Status result = Status::OK();
   if (!read_only_) {
     if (auto s = flush_unlocked(); !s.ok()) {
-      LOG_ERROR("Failed to close RocksDB[%s] due to flush failure",
+      LOG_ERROR("Failed to flush RocksDB[%s] while closing; continuing with "
+                "resource cleanup",
                 db_path_.c_str());
-      return s;
+      result = s;
     }
   }
 
@@ -326,13 +327,19 @@ Status RocksdbContext::close() {
 
   if (auto s = db_->Close(); s.ok()) {
     LOG_DEBUG("Closed RocksDB[%s]", db_path_.c_str());
-    db_.reset();
-    return Status::OK();
   } else {
     LOG_ERROR("Failed to close RocksDB[%s], code[%d], reason[%s]",
               db_path_.c_str(), s.code(), s.ToString().c_str());
-    return Status::InternalError();
+    if (result.ok()) {
+      result = Status::InternalError();
+    }
   }
+
+  // Release the DB even when Flush() or Close() reports an error. DBImpl's
+  // destructor provides the final synchronous shutdown fallback, preventing
+  // background work from surviving until process-wide static destruction.
+  db_.reset();
+  return result;
 }
 
 
