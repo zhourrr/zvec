@@ -316,9 +316,10 @@ Status RocksdbContext::close() {
   Status result = Status::OK();
   if (!read_only_) {
     if (auto s = flush_unlocked(); !s.ok()) {
-      LOG_ERROR("Failed to flush RocksDB[%s] while closing; continuing with "
-                "resource cleanup",
-                db_path_.c_str());
+      LOG_ERROR(
+          "Failed to flush RocksDB[%s] while closing; continuing with "
+          "resource cleanup",
+          db_path_.c_str());
       result = s;
     }
   }
