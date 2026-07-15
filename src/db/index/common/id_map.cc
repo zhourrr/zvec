@@ -70,6 +70,7 @@ Status IDMap::close() {
   }
 
   Status status = rocksdb_context_.close();
+  opened_ = false;
   if (status.ok()) {
     LOG_INFO("Closed IDMap[%s]", working_dir_.c_str());
   } else {
