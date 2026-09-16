@@ -4269,7 +4269,9 @@ Status SegmentImpl::recover() {
           "WAL record recovery failed: path[%s], segment[%d], record[%zu], "
           "reason[deserialization failed]",
           wal_file_path.c_str(), id(), (size_t)total_recovered_doc_count);
-      continue;
+      return Status::InternalError("Corrupt WAL document: path[", wal_file_path,
+                                   "], segment[", id(), "], record[",
+                                   total_recovered_doc_count, "]");
     }
 
     Status status;

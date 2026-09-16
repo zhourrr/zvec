@@ -85,6 +85,23 @@ static int current_test_passed = 1;  // Track if current test function passes
     }                          \
   } while (0)
 
+static void check_last_error(zvec_error_code_t code, const char *reason) {
+  char *message = NULL;
+  TEST_ASSERT(zvec_get_last_error(&message) == ZVEC_OK);
+  TEST_ASSERT(message != NULL);
+  if (message) {
+    TEST_ASSERT(strstr(message, reason) != NULL);
+  }
+  zvec_error_details_t details = {0};
+  TEST_ASSERT(zvec_get_last_error_details(&details) == ZVEC_OK);
+  TEST_ASSERT(details.code == code);
+  TEST_ASSERT(details.message != NULL);
+  if (message && details.message) {
+    TEST_ASSERT(strcmp(message, details.message) == 0);
+  }
+  zvec_free(message);
+}
+
 // =============================================================================
 // Helper functions tests
 // =============================================================================
@@ -3364,6 +3381,31 @@ void test_doc_serialization(void) {
       &deserialized_int32, sizeof(deserialized_int32));
   TEST_ASSERT(err == ZVEC_OK);
   TEST_ASSERT(deserialized_int32 == -2147483648);
+
+  const size_t truncated_sizes[] = {1, data_size / 2, data_size - 1};
+  for (size_t i = 0; i < sizeof(truncated_sizes) / sizeof(truncated_sizes[0]);
+       ++i) {
+    zvec_doc_t *invalid_doc = (zvec_doc_t *)(uintptr_t)1;
+    TEST_ASSERT(zvec_doc_deserialize(serialized_data, truncated_sizes[i],
+                                     &invalid_doc) ==
+                ZVEC_ERROR_INVALID_ARGUMENT);
+    TEST_ASSERT(invalid_doc == NULL);
+    check_last_error(ZVEC_ERROR_INVALID_ARGUMENT,
+                     "Invalid doc: serialized data is incomplete or invalid");
+  }
+  zvec_doc_t *invalid_doc = (zvec_doc_t *)(uintptr_t)1;
+  TEST_ASSERT(zvec_doc_deserialize(NULL, data_size, &invalid_doc) ==
+              ZVEC_ERROR_INVALID_ARGUMENT);
+  TEST_ASSERT(invalid_doc == NULL);
+  invalid_doc = (zvec_doc_t *)(uintptr_t)1;
+  TEST_ASSERT(zvec_doc_deserialize(serialized_data, 0, &invalid_doc) ==
+              ZVEC_ERROR_INVALID_ARGUMENT);
+  TEST_ASSERT(invalid_doc == NULL);
+  TEST_ASSERT(zvec_doc_deserialize(serialized_data, data_size, NULL) ==
+              ZVEC_ERROR_INVALID_ARGUMENT);
+  check_last_error(
+      ZVEC_ERROR_INVALID_ARGUMENT,
+      "Invalid doc: data, size and document output must be provided");
 
   zvec_free_uint8_array(serialized_data);
   free(string_field.value.string_value.data);

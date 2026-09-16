@@ -4721,8 +4721,10 @@ zvec_error_code_t zvec_doc_serialize(const zvec_doc_t *doc, uint8_t **data,
 
 zvec_error_code_t zvec_doc_deserialize(const uint8_t *data, size_t size,
                                    zvec_doc_t **doc) {
+  if (doc) *doc = nullptr;
   if (!data || !doc || size == 0) {
-    set_last_error("Invalid arguments");
+    SET_LAST_ERROR(ZVEC_ERROR_INVALID_ARGUMENT,
+                   "Invalid doc: data, size and document output must be provided");
     return ZVEC_ERROR_INVALID_ARGUMENT;
   }
 
@@ -4730,8 +4732,9 @@ zvec_error_code_t zvec_doc_deserialize(const uint8_t *data, size_t size,
       "Failed to deserialize document",
       auto deserialized_doc = zvec::Doc::deserialize(data, size);
       if (!deserialized_doc) {
-        set_last_error("Failed to deserialize document");
-        return ZVEC_ERROR_INTERNAL_ERROR;
+        SET_LAST_ERROR(ZVEC_ERROR_INVALID_ARGUMENT,
+                       "Invalid doc: serialized data is incomplete or invalid");
+        return ZVEC_ERROR_INVALID_ARGUMENT;
       }
 
       // Create a new Doc by copying the deserialized content
