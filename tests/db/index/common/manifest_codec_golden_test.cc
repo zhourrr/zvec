@@ -1081,6 +1081,38 @@ TEST(ManifestCodecGolden, IndexParamsLastBranchWins) {
   EXPECT_EQ(decoded->type(), IndexType::HNSW);
 }
 
+TEST(ManifestCodecGolden, DuplicateFieldsFailInsteadOfBeingSilentlyDropped) {
+  // This malformed schema could previously be created through the C++ list
+  // constructor. Restoring only its first field silently changes its meaning.
+  CollectionSchema schema(
+      "legacy", {std::make_shared<FieldSchema>("duplicate", DataType::INT32),
+                 std::make_shared<FieldSchema>("duplicate", DataType::INT64)});
+  std::string schema_bytes;
+  ManifestCodec::EncodeCollectionSchema(schema, &schema_bytes);
+  auto decoded_schema = ManifestCodec::DecodeCollectionSchema(schema_bytes);
+  ASSERT_FALSE(decoded_schema.has_value());
+  EXPECT_EQ(decoded_schema.error().code(), StatusCode::INTERNAL_ERROR);
+  EXPECT_NE(decoded_schema.error().message().find("duplicate"),
+            std::string::npos);
+
+  std::string manifest_bytes;
+  pbwire::Writer(&manifest_bytes).PutMessage(2, schema_bytes);
+  ManifestData restored;
+  auto status = ManifestCodec::Decode(manifest_bytes, &restored);
+  EXPECT_EQ(status.code(), StatusCode::INTERNAL_ERROR);
+  EXPECT_EQ(restored.schema, nullptr);
+}
+
+TEST(ManifestCodecGolden, MalformedNestedSchemaFailsExplicitly) {
+  const std::string malformed_schema("\x0a\x05x", 3);
+  std::string manifest_bytes;
+  pbwire::Writer(&manifest_bytes).PutMessage(2, malformed_schema);
+  ManifestData restored;
+  auto status = ManifestCodec::Decode(manifest_bytes, &restored);
+  EXPECT_EQ(status.code(), StatusCode::INTERNAL_ERROR);
+  EXPECT_EQ(restored.schema, nullptr);
+}
+
 TEST(ManifestCodecGolden, UnknownFieldsAreIgnored) {
   // Forward compatibility: a manifest written by a newer zvec may carry fields
   // this build does not know about. They must be skipped silently.
